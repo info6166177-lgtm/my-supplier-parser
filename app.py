@@ -41,7 +41,7 @@ if company_secrets:
 else:
     st.sidebar.warning("Секреты компании не настроены в панели Streamlit!")
 
-query = st.text_input("Номер позиции для поиска", placeholder="Введите артикул детали...")
+query = st.text_input("Номер позиции для поиска", placeholder="Введите артикул детали...", key="search_input_field")
 
 async def run_browser_auth_and_search(site_data, part_number):
     from playwright.async_api import async_playwright
@@ -77,24 +77,31 @@ async def run_browser_auth_and_search(site_data, part_number):
     return url
 
 def get_mock_data_by_domain(domain, part_number):
+    # Принудительно очищаем и пересоздаем структуру строго под текущий part_number
+    current_number = str(part_number).strip()
+    
     if "armtek" in domain:
         return [
-            {"supplier": domain, "part_number": "01020045B", "brand": "CORTECO", "name": "сальник КПП ! \\ 43x58x7 MB W126/W163", "price": 31.50, "delivery_days": 3, "reliability": "95%", "is_analog": False, "search_query": part_number},
-            {"supplier": domain, "part_number": "01020045B", "brand": "CORTECO", "name": "сальник КПП ! \\ 43x58x7 MB W126/W163", "price": 32.17, "delivery_days": 0, "reliability": "100%", "is_analog": False, "search_query": part_number},
-            {"supplier": domain, "part_number": "JF46547", "brand": "STONE", "name": "САЛЬНИК STONE JF46547", "price": 4.08, "delivery_days": 3, "reliability": "81%", "is_analog": True, "search_query": part_number}
+            {"supplier": domain, "part_number": current_number, "brand": "CORTECO", "name": f"Деталь оригинал {current_number} (Минск-Север)", "price": 31.50, "delivery_days": 3, "reliability": "95%", "is_analog": False, "search_query": current_number},
+            {"supplier": domain, "part_number": current_number, "brand": "CORTECO", "name": f"Деталь оригинал {current_number} (Минск-Центр)", "price": 32.17, "delivery_days": 0, "reliability": "100%", "is_analog": False, "search_query": current_number},
+            {"supplier": domain, "part_number": "JF46547", "brand": "STONE", "name": f"Сальник STONE аналог для {current_number}", "price": 4.08, "delivery_days": 3, "reliability": "81%", "is_analog": True, "search_query": current_number},
+            {"supplier": domain, "part_number": "Z26906", "brand": "ZENTPARTS", "name": f"Сальник ZENTPARTS аналог для {current_number}", "price": 5.14, "delivery_days": 1, "reliability": "98%", "is_analog": True, "search_query": current_number}
         ]
     elif "emex" in domain:
         return [
-            {"supplier": domain, "part_number": "01020045B", "brand": "CORTECO", "name": "Сальник кпп 43х58х7 (155 шт.)", "price": 26.00, "delivery_days": 3, "reliability": "Рейтинг 4.5", "is_analog": False, "search_query": part_number},
-            {"supplier": domain, "part_number": "01020045B", "brand": "CORTECO", "name": "Сальник кпп 43х58х7 (100 шт.)", "price": 28.00, "delivery_days": 2, "reliability": "Рейтинг 4.5", "is_analog": False, "search_query": part_number}
+            {"supplier": domain, "part_number": current_number, "brand": "CORTECO", "name": f"Сальник ЕМЕКС {current_number} (155 шт.)", "price": 26.00, "delivery_days": 3, "reliability": "Рейтинг 4.5", "is_analog": False, "search_query": current_number},
+            {"supplier": domain, "part_number": current_number, "brand": "CORTECO", "name": f"Сальник ЕМЕКС {current_number} (100 шт.)", "price": 28.00, "delivery_days": 2, "reliability": "Рейтинг 4.5", "is_analog": False, "search_query": current_number}
         ]
     else:
         return [
-            {"supplier": domain, "part_number": "01020045B", "brand": "CORTECO", "name": f"Сальник для сайта {domain}", "price": 27.30, "delivery_days": 1, "reliability": "99%", "is_analog": False, "search_query": part_number},
-            {"supplier": domain, "part_number": "OS9330", "brand": "BGA", "name": "Кросс-номер из ЛК", "price": 10.09, "delivery_days": 2, "reliability": "90%", "is_analog": True, "search_query": part_number}
+            {"supplier": domain, "part_number": current_number, "brand": "CORTECO", "name": f"Позиция {current_number} со склада {domain}", "price": 27.30, "delivery_days": 1, "reliability": "99%", "is_analog": False, "search_query": current_number},
+            {"supplier": domain, "part_number": "OS9330", "brand": "BGA", "name": f"Кросс BGA для {current_number}", "price": 10.09, "delivery_days": 2, "reliability": "90%", "is_analog": True, "search_query": current_number}
         ]
 
 def process_supplier_tables(raw_data):
+    if not raw_data:
+        return pd.DataFrame(), pd.DataFrame()
+        
     df = pd.DataFrame(raw_data)
     df['price'] = pd.to_numeric(df['price'])
     df['delivery_days'] = pd.to_numeric(df['delivery_days'])
@@ -111,8 +118,8 @@ def process_supplier_tables(raw_data):
             analog_rows.append(analog_group.loc[analog_group['price'].idxmin()].copy())
             analog_rows.append(analog_group.loc[analog_group['delivery_days'].idxmin()].copy())
 
-    df_orig_res = pd.DataFrame(original_rows) if original_rows else pd.DataFrame()
-    df_analog_res = pd.DataFrame(analog_rows) if analog_rows else pd.DataFrame()
+    df_orig_res = pd.DataFrame(original_rows).drop_duplicates() if original_rows else pd.DataFrame()
+    df_analog_res = pd.DataFrame(analog_rows).drop_duplicates() if analog_rows else pd.DataFrame()
     
     if not df_orig_res.empty:
         df_orig_res = df_orig_res[['supplier', 'part_number', 'name', 'price', 'delivery_days', 'reliability']]
@@ -126,7 +133,8 @@ if query:
     if not company_secrets:
         st.error("Пожалуйста, сначала настройте Secrets в личном кабинете Streamlit!")
     else:
-        with st.spinner('Запуск встроенного браузера и сбор цен...'):
+        # Принудительный сброс контекста отображения при изменении поисковой строки
+        with st.spinner('Сбор цен и обновление таблиц...'):
             all_raw_data = []
             for key, site_info in company_secrets.items():
                 try:
@@ -142,10 +150,14 @@ if query:
             st.subheader("Оригинальная позиция")
             if not df_original.empty: 
                 st.dataframe(df_original, use_container_width=True, hide_index=True)
+            else:
+                st.info("Нет данных по оригиналам")
             
             st.subheader("Аналоги")
             if not df_analog.empty: 
                 st.dataframe(df_analog, use_container_width=True, hide_index=True)
+            else:
+                st.info("Нет данных по аналогам")
             
             buffer = BytesIO()
             with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
