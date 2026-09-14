@@ -23,46 +23,65 @@ st.markdown("""
 
 st.title("📦 Поиск позиций по поставщикам")
 
-# Боковая панель для ввода данных (Адрес, Логин, Пароль строго по вашему ТЗ)
-st.sidebar.header("🔐 Авторизация у поставщиков")
+# Инициализация хранилища для списка ваших поставщиков в памяти сессии браузере
+if "suppliers" not in st.session_state:
+    # Задаем стартовый список на основе ваших сайтов
+    st.session_state.suppliers = [
+        {"url": "armtek.by", "login": "", "password": ""},
+        {"url": "shate-m.by", "login": "", "password": ""},
+        {"url": "emex.ru", "login": "", "password": ""},
+    ]
 
-with st.sidebar.expander("Армтек", expanded=False):
-    armtek_url = st.text_input("Адрес сайта / API Армтек", value="https://armtek.by", key="arm_u")
-    armtek_login = st.text_input("Логин Армтек", key="arm_l")
-    armtek_pass = st.text_input("Пароль Армтек", type="password", key="arm_p")
+# ЛЕВОЕ МЕНЮ
+st.sidebar.header("🔐 Настройки поставщиков")
 
-with st.sidebar.expander("Шате-М", expanded=False):
-    shate_url = st.text_input("Адрес сайта / API Шате-М", value="https://shate-m.by", key="sh_u")
-    shate_login = st.text_input("Логин Шате-М", key="sh_l")
-    shate_pass = st.text_input("Пароль Шате-М", type="password", key="sh_p")
+# Кнопка "+" для добавления нового поставщика
+with st.sidebar.expander("➕ Добавить поставщика", expanded=False):
+    new_url = st.text_input("Адрес нового сайта (например, sferam.by)", key="new_u").strip()
+    new_login = st.text_input("Логин", key="new_l")
+    new_pass = st.text_input("Пароль", type="password", key="new_p")
+    if st.button("Сохранить поставщика"):
+        if new_url:
+            # Проверяем, нет ли уже такого сайта в списке
+            if not any(s['url'] == new_url for s in st.session_state.suppliers):
+                st.session_state.suppliers.append({"url": new_url, "login": new_login, "password": new_pass})
+                st.success(f"Сайт {new_url} добавлен!")
+                st.rerun()
+            else:
+                st.warning("Этот сайт уже есть в списке.")
+        else:
+            st.error("Адрес сайта не может быть пустым.")
 
-with st.sidebar.expander("Эмикс", expanded=False):
-    emex_url = st.text_input("Адрес сайта / API Эмикс", value="https://emex.ru", key="em_u")
-    emex_login = st.text_input("Логин Эмикс", key="em_l")
-    emex_pass = st.text_input("Пароль Эмикс", type="password", key="em_p")
+st.sidebar.markdown("---")
+st.sidebar.subheader("Список подключенных сайтов:")
 
-with st.sidebar.expander("Сфера", expanded=False):
-    sfera_url = st.text_input("Адрес сайта / API Сфера", key="sf_u")
-    sfera_login = st.text_input("Логин Сфера", key="sf_l")
-    sfera_pass = st.text_input("Пароль Сфера", type="password", key="sf_p")
+# Динамически создаем вкладки для каждого сайта из списка
+for idx, supplier in enumerate(st.session_state.suppliers):
+    with st.sidebar.expander(supplier["url"], expanded=False):
+        # Позволяем редактировать данные прямо здесь
+        supplier["url"] = st.text_input("Адрес сайта", value=supplier["url"], key=f"url_{idx}")
+        supplier["login"] = st.text_input("Логин", value=supplier["login"], key=f"log_{idx}")
+        supplier["password"] = st.text_input("Пароль", value=supplier["password"], type="password", key=f"pas_{idx}")
 
+# ПОЛЕ ПОИСКА ПО ЦЕНТРУ
 query = st.text_input("Номер позиции для поиска", placeholder="Введите артикул детали...")
 
-def fetch_raw_data_from_suppliers(part_number):
-    # Модель реальных данных на основе присланного вами поиска Armtek.by по артикулу 01020045b
-    return [
-        # Оригиналы CORTECO
-        {"supplier": "Армтек", "part_number": "01020045B", "brand": "CORTECO", "price": 31.50, "delivery_days": 3, "is_analog": False, "search_query": part_number},
-        {"supplier": "Армтек", "part_number": "01020045B", "brand": "CORTECO", "price": 32.17, "delivery_days": 0, "is_analog": False, "search_query": part_number},
-        # Аналоги (Кроссы)
-        {"supplier": "Армтек", "part_number": "JF46547", "brand": "STONE", "price": 4.08, "delivery_days": 3, "is_analog": True, "search_query": part_number},
-        {"supplier": "Армтек", "part_number": "Z26906", "brand": "ZENTPARTS", "price": 5.14, "delivery_days": 1, "is_analog": True, "search_query": part_number},
+def fetch_raw_data_from_suppliers(part_number, active_suppliers):
+    """
+    Математическая модель. Она берет список НАСТОЯЩИХ сайтов, которые вы ввели в меню,
+    и генерирует для них корректные строки ответов на основе вашей страницы armtek.by.
+    """
+    results = []
+    for s in active_suppliers:
+        site_name = s["url"]
+        # Генерируем оригиналы для каждого вашего сайта
+        results.append({"supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", "price": 31.50, "delivery_days": 3, "is_analog": False, "search_query": part_number})
+        results.append({"supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", "price": 32.17, "delivery_days": 0, "is_analog": False, "search_query": part_number})
         
-        # Моделирование Шате-М для проверки работы таблиц
-        {"supplier": "Шате-М", "part_number": "01020045B", "brand": "CORTECO", "price": 33.10, "delivery_days": 1, "is_analog": False, "search_query": part_number},
-        {"supplier": "Шате-М", "part_number": "34817", "brand": "FEBI", "price": 21.65, "delivery_days": 2, "is_analog": True, "search_query": part_number},
-        {"supplier": "Шате-М", "part_number": "466.042", "brand": "ELRING", "price": 30.95, "delivery_days": 0, "is_analog": True, "search_query": part_number},
-    ]
+        # Генерируем аналоги (кроссы) для каждого вашего сайта
+        results.append({"supplier": site_name, "part_number": "JF46547", "brand": "STONE", "price": 4.08, "delivery_days": 3, "is_analog": True, "search_query": part_number})
+        results.append({"supplier": site_name, "part_number": "Z26906", "brand": "ZENTPARTS", "price": 5.14, "delivery_days": 1, "is_analog": True, "search_query": part_number})
+    return results
 
 def process_supplier_tables(raw_data):
     df = pd.DataFrame(raw_data)
@@ -84,7 +103,7 @@ def process_supplier_tables(raw_data):
             idx_min_price_an = analog_group['price'].idxmin()
             idx_min_time_an = analog_group['delivery_days'].idxmin()
             analog_rows.append(analog_group.loc[idx_min_price_an].copy())
-            analog_rows.append(analog_group.copy().loc[idx_min_time_an].copy())
+            analog_rows.append(analog_group.loc[idx_min_time_an].copy())
 
     df_orig_res = pd.DataFrame(original_rows) if original_rows else pd.DataFrame()
     df_analog_res = pd.DataFrame(analog_rows) if analog_rows else pd.DataFrame()
@@ -101,7 +120,8 @@ def process_supplier_tables(raw_data):
 
 if query:
     with st.spinner('Получение данных...'):
-        raw_results = fetch_raw_data_from_suppliers(query)
+        # Передаем в поиск только те сайты, которые сейчас настроены в левом меню
+        raw_results = fetch_raw_data_from_suppliers(query, st.session_state.suppliers)
         df_original, df_analog = process_supplier_tables(raw_results)
         
         st.subheader("Оригинальная позиция")
