@@ -23,7 +23,9 @@ if "brand_selection" not in st.session_state:
 
 async def fetch_live_playwright_data(site_info, part_number, selected_brand=None):
     from playwright.async_api import async_playwright
-    url, login, password = site_info.get("url", ""), site_info.get("login", ""), site_info.get("password", "")
+    url = site_info.get("url", "")
+    login = site_info.get("login", "")
+    password = site_info.get("password", "")
     products = []
     os.system("playwright install chromium")
     
@@ -141,10 +143,18 @@ if query:
                         st.rerun()
 
         df_original, df_analog = process_supplier_tables(all_raw_data, query)
+        
         st.subheader("Оригинальная позиция")
-        st.dataframe(df_original, use_container_width=True, hide_index=True) if not df_original.empty else st.info("Позиция не найдена")
+        if not df_original.empty:
+            st.dataframe(df_original, use_container_width=True, hide_index=True)
+        else:
+            st.info("Позиция не найдена")
+            
         st.subheader("Аналоги")
-        st.dataframe(df_analog, use_container_width=True, hide_index=True) if not df_analog.empty else st.info("Аналоги не найдены")
+        if not df_analog.empty:
+            st.dataframe(df_analog, use_container_width=True, hide_index=True)
+        else:
+            st.info("Аналоги не найдены")
         
         if not df_original.empty or not df_analog.empty:
             buffer = BytesIO()
