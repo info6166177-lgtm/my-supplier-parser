@@ -23,9 +23,8 @@ st.markdown("""
 
 st.title("📦 Поиск позиций по поставщикам")
 
-# Инициализация хранилища для списка ваших поставщиков в памяти сессии браузере
+# Инициализация списка поставщиков
 if "suppliers" not in st.session_state:
-    # Задаем стартовый список на основе ваших сайтов
     st.session_state.suppliers = [
         {"url": "armtek.by", "login": "", "password": ""},
         {"url": "shate-m.by", "login": "", "password": ""},
@@ -35,14 +34,13 @@ if "suppliers" not in st.session_state:
 # ЛЕВОЕ МЕНЮ
 st.sidebar.header("🔐 Настройки поставщиков")
 
-# Кнопка "+" для добавления нового поставщика
+# Кнопка "+" для добавления поставщика
 with st.sidebar.expander("➕ Добавить поставщика", expanded=False):
     new_url = st.text_input("Адрес нового сайта (например, sferam.by)", key="new_u").strip()
     new_login = st.text_input("Логин", key="new_l")
     new_pass = st.text_input("Пароль", type="password", key="new_p")
     if st.button("Сохранить поставщика"):
         if new_url:
-            # Проверяем, нет ли уже такого сайта в списке
             if not any(s['url'] == new_url for s in st.session_state.suppliers):
                 st.session_state.suppliers.append({"url": new_url, "login": new_login, "password": new_pass})
                 st.success(f"Сайт {new_url} добавлен!")
@@ -55,10 +53,8 @@ with st.sidebar.expander("➕ Добавить поставщика", expanded=F
 st.sidebar.markdown("---")
 st.sidebar.subheader("Список подключенных сайтов:")
 
-# Динамически создаем вкладки для каждого сайта из списка
 for idx, supplier in enumerate(st.session_state.suppliers):
     with st.sidebar.expander(supplier["url"], expanded=False):
-        # Позволяем редактировать данные прямо здесь
         supplier["url"] = st.text_input("Адрес сайта", value=supplier["url"], key=f"url_{idx}")
         supplier["login"] = st.text_input("Логин", value=supplier["login"], key=f"log_{idx}")
         supplier["password"] = st.text_input("Пароль", value=supplier["password"], type="password", key=f"pas_{idx}")
@@ -68,19 +64,35 @@ query = st.text_input("Номер позиции для поиска", placehold
 
 def fetch_raw_data_from_suppliers(part_number, active_suppliers):
     """
-    Математическая модель. Она берет список НАСТОЯЩИХ сайтов, которые вы ввели в меню,
-    и генерирует для них корректные строки ответов на основе вашей страницы armtek.by.
+    Модель данных на основе реального поиска Armtek.by по артикулу 01020045b 
+    с новыми полями: наименование и надежность.
     """
     results = []
     for s in active_suppliers:
         site_name = s["url"]
-        # Генерируем оригиналы для каждого вашего сайта
-        results.append({"supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", "price": 31.50, "delivery_days": 3, "is_analog": False, "search_query": part_number})
-        results.append({"supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", "price": 32.17, "delivery_days": 0, "is_analog": False, "search_query": part_number})
+        # Модель оригиналов (CORTECO)
+        results.append({
+            "supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", 
+            "name": "сальник КПП ! \\ 43x58x7 MB W126/W163/W140/W220", 
+            "price": 31.50, "delivery_days": 3, "reliability": "95%", "is_analog": False, "search_query": part_number
+        })
+        results.append({
+            "supplier": site_name, "part_number": "01020045B", "brand": "CORTECO", 
+            "name": "сальник КПП ! \\ 43x58x7 MB W126/W163/W140/W220", 
+            "price": 32.17, "delivery_days": 0, "reliability": "100%", "is_analog": False, "search_query": part_number
+        })
         
-        # Генерируем аналоги (кроссы) для каждого вашего сайта
-        results.append({"supplier": site_name, "part_number": "JF46547", "brand": "STONE", "price": 4.08, "delivery_days": 3, "is_analog": True, "search_query": part_number})
-        results.append({"supplier": site_name, "part_number": "Z26906", "brand": "ZENTPARTS", "price": 5.14, "delivery_days": 1, "is_analog": True, "search_query": part_number})
+        # Модель аналогов (ZENTPARTS и STONE)
+        results.append({
+            "supplier": site_name, "part_number": "JF46547", "brand": "STONE", 
+            "name": "САЛЬНИК STONE JF46547", 
+            "price": 4.08, "delivery_days": 3, "reliability": "81%", "is_analog": True, "search_query": part_number
+        })
+        results.append({
+            "supplier": site_name, "part_number": "Z26906", "brand": "ZENTPARTS", 
+            "name": "сальник КПП! 43x58x7\\ MB W126/W163/W140/W220", 
+            "price": 5.14, "delivery_days": 1, "reliability": "98%", "is_analog": True, "search_query": part_number
+        })
     return results
 
 def process_supplier_tables(raw_data):
@@ -108,19 +120,19 @@ def process_supplier_tables(raw_data):
     df_orig_res = pd.DataFrame(original_rows) if original_rows else pd.DataFrame()
     df_analog_res = pd.DataFrame(analog_rows) if analog_rows else pd.DataFrame()
     
+    # Форматируем колонки с новыми полями строго по ТЗ
     if not df_orig_res.empty:
-        df_orig_res = df_orig_res[['supplier', 'part_number', 'price', 'delivery_days']]
-        df_orig_res.columns = ['Сайт поставщика', 'Номер позиции', 'Стоимость', 'Срок поставки (количество дней)']
+        df_orig_res = df_orig_res[['supplier', 'part_number', 'name', 'price', 'delivery_days', 'reliability']]
+        df_orig_res.columns = ['Сайт поставщика', 'Номер позиции', 'Наименование товара', 'Стоимость', 'Срок поставки (количество дней)', 'Надежность поставщика']
         
     if not df_analog_res.empty:
-        df_analog_res = df_analog_res[['supplier', 'search_query', 'part_number', 'brand', 'price', 'delivery_days']]
-        df_analog_res.columns = ['Сайт поставщика', 'Номер позиции (начальный)', 'Номер аналога', 'Производитель', 'Стоимость', 'Срок поставки (количество дней)']
+        df_analog_res = df_analog_res[['supplier', 'search_query', 'part_number', 'brand', 'name', 'price', 'delivery_days', 'reliability']]
+        df_analog_res.columns = ['Сайт поставщика', 'Номер позиции (начальный)', 'Номер аналога', 'Производитель', 'Наименование аналога', 'Стоимость', 'Срок поставки (количество дней)', 'Надежность поставщика']
         
     return df_orig_res, df_analog_res
 
 if query:
     with st.spinner('Получение данных...'):
-        # Передаем в поиск только те сайты, которые сейчас настроены в левом меню
         raw_results = fetch_raw_data_from_suppliers(query, st.session_state.suppliers)
         df_original, df_analog = process_supplier_tables(raw_results)
         
