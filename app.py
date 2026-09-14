@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from io import BytesIO
 
-# Настройки страницы
 st.set_page_config(page_title="Агрегатор Поставщиков", layout="wide")
 
 st.markdown("""
@@ -24,44 +23,45 @@ st.markdown("""
 
 st.title("📦 Поиск позиций по поставщикам")
 
-# Боковая панель для ввода логинов и паролей
+# Боковая панель для ввода данных (Адрес, Логин, Пароль строго по вашему ТЗ)
 st.sidebar.header("🔐 Авторизация у поставщиков")
+
 with st.sidebar.expander("Армтек", expanded=False):
+    armtek_url = st.text_input("Адрес сайта / API Армтек", value="https://armtek.by", key="arm_u")
     armtek_login = st.text_input("Логин Армтек", key="arm_l")
     armtek_pass = st.text_input("Пароль Армтек", type="password", key="arm_p")
 
 with st.sidebar.expander("Шате-М", expanded=False):
+    shate_url = st.text_input("Адрес сайта / API Шате-М", value="https://shate-m.by", key="sh_u")
     shate_login = st.text_input("Логин Шате-М", key="sh_l")
     shate_pass = st.text_input("Пароль Шате-М", type="password", key="sh_p")
 
 with st.sidebar.expander("Эмикс", expanded=False):
+    emex_url = st.text_input("Адрес сайта / API Эмикс", value="https://emex.ru", key="em_u")
     emex_login = st.text_input("Логин Эмикс", key="em_l")
     emex_pass = st.text_input("Пароль Эмикс", type="password", key="em_p")
 
 with st.sidebar.expander("Сфера", expanded=False):
+    sfera_url = st.text_input("Адрес сайта / API Сфера", key="sf_u")
     sfera_login = st.text_input("Логин Сфера", key="sf_l")
     sfera_pass = st.text_input("Пароль Сфера", type="password", key="sf_p")
 
-# Поле поиска
 query = st.text_input("Номер позиции для поиска", placeholder="Введите артикул детали...")
 
 def fetch_raw_data_from_suppliers(part_number):
-    # Тестовые данные для проверки логики (2 строки на оригинал, 2 на аналог)
+    # Модель реальных данных на основе присланного вами поиска Armtek.by по артикулу 01020045b
     return [
-        {"supplier": "Армтек", "part_number": part_number, "brand": "Original", "price": 1020, "delivery_days": 2, "is_analog": False, "search_query": part_number},
-        {"supplier": "Армтек", "part_number": part_number, "brand": "Original", "price": 950, "delivery_days": 5, "is_analog": False, "search_query": part_number},
-        {"supplier": "Армтек", "part_number": "AN-11", "brand": "Bosch", "price": 700, "delivery_days": 3, "is_analog": True, "search_query": part_number},
-        {"supplier": "Армтек", "part_number": "AN-22", "brand": "Brembo", "price": 850, "delivery_days": 1, "is_analog": True, "search_query": part_number},
+        # Оригиналы CORTECO
+        {"supplier": "Армтек", "part_number": "01020045B", "brand": "CORTECO", "price": 31.50, "delivery_days": 3, "is_analog": False, "search_query": part_number},
+        {"supplier": "Армтек", "part_number": "01020045B", "brand": "CORTECO", "price": 32.17, "delivery_days": 0, "is_analog": False, "search_query": part_number},
+        # Аналоги (Кроссы)
+        {"supplier": "Армтек", "part_number": "JF46547", "brand": "STONE", "price": 4.08, "delivery_days": 3, "is_analog": True, "search_query": part_number},
+        {"supplier": "Армтек", "part_number": "Z26906", "brand": "ZENTPARTS", "price": 5.14, "delivery_days": 1, "is_analog": True, "search_query": part_number},
         
-        {"supplier": "Шате-М", "part_number": part_number, "brand": "Original", "price": 980, "delivery_days": 1, "is_analog": False, "search_query": part_number},
-        {"supplier": "Шате-М", "part_number": "AN-33", "brand": "LPR", "price": 600, "delivery_days": 4, "is_analog": True, "search_query": part_number},
-        {"supplier": "Шате-М", "part_number": "AN-44", "brand": "Patron", "price": 650, "delivery_days": 2, "is_analog": True, "search_query": part_number},
-        
-        {"supplier": "Эмикс", "part_number": part_number, "brand": "Original", "price": 1100, "delivery_days": 0, "is_analog": False, "search_query": part_number},
-        {"supplier": "Эмикс", "part_number": part_number, "brand": "Original", "price": 1050, "delivery_days": 3, "is_analog": False, "search_query": part_number},
-        
-        {"supplier": "Сфера", "part_number": part_number, "brand": "Original", "price": 1200, "delivery_days": 1, "is_analog": False, "search_query": part_number},
-        {"supplier": "Сфера", "part_number": "AN-55", "brand": "Febi", "price": 500, "delivery_days": 7, "is_analog": True, "search_query": part_number},
+        # Моделирование Шате-М для проверки работы таблиц
+        {"supplier": "Шате-М", "part_number": "01020045B", "brand": "CORTECO", "price": 33.10, "delivery_days": 1, "is_analog": False, "search_query": part_number},
+        {"supplier": "Шате-М", "part_number": "34817", "brand": "FEBI", "price": 21.65, "delivery_days": 2, "is_analog": True, "search_query": part_number},
+        {"supplier": "Шате-М", "part_number": "466.042", "brand": "ELRING", "price": 30.95, "delivery_days": 0, "is_analog": True, "search_query": part_number},
     ]
 
 def process_supplier_tables(raw_data):
@@ -84,7 +84,7 @@ def process_supplier_tables(raw_data):
             idx_min_price_an = analog_group['price'].idxmin()
             idx_min_time_an = analog_group['delivery_days'].idxmin()
             analog_rows.append(analog_group.loc[idx_min_price_an].copy())
-            analog_rows.append(analog_group.loc[idx_min_time_an].copy())
+            analog_rows.append(analog_group.copy().loc[idx_min_time_an].copy())
 
     df_orig_res = pd.DataFrame(original_rows) if original_rows else pd.DataFrame()
     df_analog_res = pd.DataFrame(analog_rows) if analog_rows else pd.DataFrame()
